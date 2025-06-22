@@ -463,3 +463,59 @@
 (define-read-only (get-vault (vault-id uint))
   (map-get? vaults { vault-id: vault-id })
 )
+
+(define-read-only (get-user-vaults (user principal))
+  (map-get? user-vaults { user: user })
+)
+
+(define-read-only (get-protocol-stats)
+  {
+    total-vaults: (var-get total-vaults),
+    total-debt: (var-get total-debt),
+    total-stx-collateral: (var-get total-stx-collateral),
+    total-xbtc-collateral: (var-get total-xbtc-collateral),
+    total-usdx-supply: (ft-get-supply usdx),
+  }
+)
+
+(define-read-only (is-vault-safe (vault-id uint))
+  (match (calculate-health-factor vault-id)
+    health-factor (ok (>= health-factor LIQUIDATION-RATIO))
+    error (err error)
+  )
+)
+
+;; PROTOCOL ADMINISTRATION AND GOVERNANCE
+
+(define-public (emergency-shutdown)
+  (begin
+    (asserts! (is-eq tx-sender CONTRACT-OWNER) ERR-NOT-AUTHORIZED)
+    ;; Emergency shutdown implementation
+    (ok true)
+  )
+)
+
+(define-public (update-liquidation-ratio (new-ratio uint))
+  (begin
+    (asserts! (is-eq tx-sender CONTRACT-OWNER) ERR-NOT-AUTHORIZED)
+    (asserts! (and (>= new-ratio u120) (<= new-ratio u200)) ERR-INVALID-AMOUNT)
+    ;; Note: Production implementation would update data-var
+    (ok true)
+  )
+)
+
+;; PROTOCOL INITIALIZATION
+
+;; Initialize contract owner as default oracle operator
+(map-set oracle-operators CONTRACT-OWNER true) 
+;; Bootstrap initial price feeds with placeholder values
+(map-set price-feeds { asset: "STX" } {
+  price: u1000000, ;; $1.00 placeholder
+  timestamp: stacks-block-height,
+  confidence: u95,
+}) 
+(map-set price-feeds { asset: "xBTC" } {
+  price: u100000000000, ;; $100,000 placeholder
+  timestamp: stacks-block-height,
+  confidence: u95,
+})
